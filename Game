@@ -1,0 +1,145 @@
+import pygame
+import random as r
+import time
+
+
+class Circle:
+    def __init__(self, scr, x, y, w, h):
+        self.x = x
+        self.y = y
+        self.w = w
+        self.h = h
+        self.scr = scr
+        self.score = r.choice([1, 1, 1, 2, 2, 3])
+        self.col = pygame.Color([(255, 153, 51), "white", "yellow"][self.score - 1])
+        self.scale = [90, 60, 30][self.score - 1]
+        pygame.draw.circle(scr, self.col, (x, y), 30)
+        self.vector = r.randint(1, 4)
+
+    def check(self):
+        if self.x == self.scale:
+            if self.y == self.scale:
+                self.vector = 4
+            elif self.vector == 2:
+                self.vector = 1
+            else:
+                self.vector = 4
+        elif self.y == self.scale:
+            if self.x == self.w - self.scale:
+                self.vector = 3
+            elif self.vector == 1:
+                self.vector = 4
+            else:
+                self.vector = 3
+        elif self.x == self.w - self.scale:
+            if self.y == self.h - self.scale:
+                self.vector = 2
+            elif self.vector == 1:
+                self.vector = 2
+            else:
+                self.vector = 3
+        elif self.y == self.h - self.scale:
+            if self.x == self.scale:
+                self.vector = 1
+            elif self.vector == 3:
+                self.vector = 2
+            else:
+                self.vector = 1
+
+    def move(self):
+        if self.vector == 1:
+            self.x += 1
+            self.y -= 1
+        elif self.vector == 2:
+            self.x -= 1
+            self.y -= 1
+        elif self.vector == 3:
+            self.x -= 1
+            self.y += 1
+        elif self.vector == 4:
+            self.x += 1
+            self.y += 1
+        if self.__class__ == Bomb:
+            pygame.draw.circle(self.scr, pygame.Color("red"), (self.x, self.y), self.scale + 5)
+        pygame.draw.circle(self.scr, self.col, (self.x, self.y), self.scale)
+
+    def shoot(self, x, y):
+        if ((self.x - x) ** 2 + (self.y - y) ** 2) ** 0.5 <= self.scale:
+            global score
+            score += self.score
+            return True
+
+
+class Bomb(Circle):
+    def shoot(self, x, y):
+        if ((self.x - x) ** 2 + (self.y - y) ** 2) ** 0.5 <= self.scale:
+            global score, all_circles
+            if 1 == r.randint(1, 5):
+                all_circles.append(Bomb(self.scr, self.x // 1, self.y // 1, self.w, self.h))
+                all_circles.append(Bomb(self.scr, self.x // 1, self.y // 1, self.w, self.h))
+            else:
+                all_circles.append(Circle(self.scr, self.x // 1, self.y // 1, self.w, self.h))
+                all_circles.append(Circle(self.scr, self.x // 1, self.y // 1, self.w, self.h))
+            score += self.score
+            return True
+
+
+if __name__ == '__main__':
+    pygame.init()
+    pygame.display.set_caption('')
+    size = width, height = 600, 600
+    screen = pygame.display.set_mode(size)
+
+    running = True
+    all_circles = []
+    font = pygame.font.Font(None, 50)
+    score = 0
+    miss = 0
+    clock = pygame.time.Clock()
+    screen.fill(pygame.Color('black'))
+    while running:
+        if 1 == r.randint(1, 100):
+            screen.fill(pygame.Color('black'))
+            text = font.render("Очки " + str(score), True, (0, 255, 0))
+            screen.blit(text, (10, 10))
+            text = font.render("Промахи " + str(miss), True, (255, 0, 0))
+            screen.blit(text, (10, 50))
+            scale = 0
+            x1, y1 = r.randint(35, width - 35), r.randint(35, height - 35)
+            if 1 == r.randint(1, 5):
+                all_circles.append(Bomb(screen, x1 // 1, y1 // 1, width, height))
+            else:
+                all_circles.append(Circle(screen, x1 // 1, y1 // 1, width, height))
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                x_mouse, y_mouse = event.pos
+                before = len(all_circles)
+                for i in range(len(all_circles)):
+                    if all_circles[i].shoot(x_mouse, y_mouse):
+                        text = font.render("Очки " + str(score), True, (0, 255, 0))
+                        screen.blit(text, (10, 10))
+                        all_circles.pop(i)
+                        break
+                if before == len(all_circles):
+                    text = font.render("Промахи " + str(miss), True, (255, 0, 0))
+                    screen.blit(text, (10, 50))
+                    miss += 1
+        for i in all_circles:
+            i.check()
+        screen.fill(pygame.Color('black'))
+        text = font.render("Очки " + str(score), True, (0, 255, 0))
+        screen.blit(text, (10, 10))
+        text = font.render("Промахи " + str(miss), True, (255, 0, 0))
+        screen.blit(text, (10, 50))
+        time.sleep(0.01)
+        for i in all_circles:
+            i.move()
+            text = font.render("Очки " + str(score), True, (0, 255, 0))
+            screen.blit(text, (10, 10))
+            text = font.render("Промахи " + str(miss), True, (255, 0, 0))
+            screen.blit(text, (10, 50))
+
+        pygame.display.flip()
+    pygame.quit()
