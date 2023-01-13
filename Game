@@ -1,6 +1,17 @@
+import os
 import pygame
 import random as r
 import time
+import sys
+
+
+def load_image(name):
+    fullname = os.path.join(name)
+    if not os.path.isfile(fullname):
+        print(f"Файл с изображением '{fullname}' не найден")
+        sys.exit()
+    image = pygame.image.load(fullname)
+    return image
 
 
 class Circle:
@@ -69,31 +80,40 @@ class Circle:
 
     def shoot(self, x, y):
         if ((self.x - x) ** 2 + (self.y - y) ** 2) ** 0.5 <= self.scale:
-            global score
-            score += self.score
+            global score, score_streak, all_particles
+            for count in range(r.randint(30, 60)):
+                all_particles.append(Particle(self.col, self.x, self.y, self.scr))
+            score += self.score * (1 + score_streak // 10)
+            score_streak += self.score
             return True
 
 
 class Bomb(Circle):
     def shoot(self, x, y):
         if ((self.x - x) ** 2 + (self.y - y) ** 2) ** 0.5 <= self.scale:
-            global score, all_circles
+            global score, score_streak, all_circles, all_particles
+            for count in range(r.randint(30, 60)):
+                all_particles.append(Particle(r.choice([self.col, pygame.Color("red")]), self.x, self.y, self.scr))
             if 1 == r.randint(1, 5):
                 all_circles.append(Bomb(self.scr, self.x // 1, self.y // 1, self.w, self.h))
                 all_circles.append(Bomb(self.scr, self.x // 1, self.y // 1, self.w, self.h))
             else:
                 all_circles.append(Circle(self.scr, self.x // 1, self.y // 1, self.w, self.h))
                 all_circles.append(Circle(self.scr, self.x // 1, self.y // 1, self.w, self.h))
-            score += self.score
+            score += self.score * (1 + score_streak // 10)
+            score_streak += self.score
             return True
 
 
 class Heal(Circle):
     def shoot(self, x, y):
         if ((self.x - x) ** 2 + (self.y - y) ** 2) ** 0.5 <= self.scale:
-            global score, health
+            global score, score_streak, health, all_particles
+            for count in range(r.randint(30, 60)):
+                all_particles.append(Particle(r.choice([self.col, pygame.Color("green")]), self.x, self.y, self.scr))
             health += self.score
-            score += self.score + (health % 10) * (health // 10)
+            score += self.score + (health % 10) * (health // 10) * (1 + score_streak // 10)
+            score_streak += self.score + (health % 10) * (health // 10)
             health -= (health % 10) * (health // 10)
             return True
 
@@ -101,15 +121,44 @@ class Heal(Circle):
 class Clear(Circle):
     def shoot(self, x, y):
         if ((self.x - x) ** 2 + (self.y - y) ** 2) ** 0.5 <= self.scale:
-            global score, all_circles
-            score += self.score
-            while all_circles:
-                if all_circles[0].__class__ == Clear:
-                    all_circles.pop(0)
+            global score, score_streak, all_circles, all_particles
+            for count in range(r.randint(30, 60)):
+                all_particles.append(Particle(r.choice([self.col, pygame.Color("blue")]), self.x, self.y, self.scr))
+            score += self.score * (1 + score_streak // 10)
+            score_streak += self.score
+            for circle in all_circles:
+                if circle.__class__ == Clear and all_circles:
+                    all_circles.pop(all_circles.index(circle))
+            for count in range(5):
+                if all_circles:
+                    if all_circles[0].__class__ == Clear:
+                        all_circles.pop(0)
                 if all_circles:
                     all_circles[0].shoot(all_circles[0].x, all_circles[0].y)
                 if all_circles:
                     all_circles.pop(0)
+            return True
+
+
+class Particle:
+    def __init__(self, color, x, y, scr):
+        self.color = color
+        self.x = x
+        self.y = y
+        self.life = r.randint(50, 80)
+        self.scr = scr
+        pygame.draw.circle(self.scr, self.color, (self.x, self.y), 3)
+
+    def draw(self):
+        pygame.draw.circle(self.scr, self.color, (self.x, self.y), 3)
+
+    def move(self):
+        self.x += r.choice([-2, -1, 1, 2])
+        self.y += r.choice([-2, -1, 1, 2])
+        self.life -= 1
+
+    def dead(self):
+        if self.life <= 0:
             return True
 
 
@@ -121,12 +170,16 @@ if __name__ == '__main__':
 
     running = True
     all_circles = []
+    all_particles = []
     font = pygame.font.Font(None, 50)
     score = 0
+    score_streak = 1.0
     health = 3
     clock = pygame.time.Clock()
     screen.fill(pygame.Color('black'))
     while running:
+        if score_streak > 1:
+            score_streak -= 0.02
         if 1 == r.randint(1, 100):
             scale = 0
             x1, y1 = r.randint(35, width - 35), r.randint(35, height - 35)
@@ -144,36 +197,34 @@ if __name__ == '__main__':
                 x_mouse, y_mouse = event.pos
                 before = len(all_circles)
                 for i in range(len(all_circles)):
+                    blue = all_circles[i].__class__ != Clear
                     if all_circles[i].shoot(x_mouse, y_mouse):
-                        text = font.render("Очки " + str(score), True, (0, 255, 0))
-                        screen.blit(text, (10, 10))
-                        if all_circles:
+                        if all_circles and blue:
                             all_circles.pop(i)
                         break
                 if before == len(all_circles):
-                    text = font.render("Жизни " + str(health) + " / 10", True, (255, 0, 0))
-                    screen.blit(text, (10, 50))
                     health -= 1
         for i in all_circles:
             i.check()
         screen.fill(pygame.Color('black'))
-        text = font.render("Очки " + str(score), True, (0, 255, 0))
-        screen.blit(text, (10, 10))
-        text = font.render("Жизни " + str(health) + " / 10", True, (255, 0, 0))
-        screen.blit(text, (10, 50))
-        text = font.render("Шары " + str(len(all_circles)) + " / 30", True, (255, 0, 0))
-        screen.blit(text, (10, 90))
         time.sleep(0.01)
         for i in all_circles:
             if i.x < 0 or i.x > width or i.y < 0 or i.y > height:
                 all_circles.pop(all_circles.index(i))
             i.move()
-            text = font.render("Очки " + str(score), True, (0, 255, 0))
-            screen.blit(text, (10, 10))
-            text = font.render("Жизни " + str(health) + " / 10", True, (255, 0, 0))
-            screen.blit(text, (10, 50))
-            text = font.render("Шары " + str(len(all_circles)) + " / 30", True, (255, 0, 0))
-            screen.blit(text, (10, 90))
+        for i in all_particles:
+            i.move()
+            i.draw()
+            if i.dead():
+                all_particles.pop(all_particles.index(i))
+        text = font.render("Очки " + str(score), True, (0, 255, 0))
+        screen.blit(text, (10, 10))
+        text = font.render("Кураж " + str(score_streak // 0.01 / 100), True, (0, 255, 0))
+        screen.blit(text, (10, 50))
+        text = font.render("Жизни " + str(health) + " / 10", True, (255, 0, 0))
+        screen.blit(text, (10, 90))
+        text = font.render("Шары " + str(len(all_circles)) + " / 30", True, (255, 0, 0))
+        screen.blit(text, (10, 130))
         if health <= 0 or len(all_circles) >= 30:
             screen.fill(pygame.Color("black"))
             text = font.render("Game over!", True, (255, 0, 0))
