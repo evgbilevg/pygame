@@ -11,6 +11,8 @@ def load_image(name):
         print(f"Файл с изображением '{fullname}' не найден")
         sys.exit()
     image = pygame.image.load(fullname)
+    colorkey = image.get_at((0, 0))
+    image.set_colorkey(colorkey)
     return image
 
 
@@ -25,7 +27,26 @@ class Circle:
         self.col = pygame.Color([(255, 153, 51), "white", "yellow"][self.score - 1])
         self.scale = [30, 20, 10][self.score - 1]
         pygame.draw.circle(scr, self.col, (x, y), 30)
+        self.vector_x = r.choice([1, 3])
+        self.vector_y = r.choice([1, 3])
         self.vector = r.randint(1, 4)
+
+    def check_new(self):
+        if self.x == self.scale or self.x == self.w - self.scale:
+            self.vector_y += 2
+        if self.y == self.scale or self.y == self.h - self.scale:
+            self.vector_x += 2
+
+    def move_new(self):
+        self.x += self.vector_y % 4 - 2
+        self.y += self.vector_x % 4 - 2
+        if self.__class__ == Bomb:
+            pygame.draw.circle(self.scr, pygame.Color("red"), (self.x, self.y), self.scale + 5)
+        elif self.__class__ == Heal:
+            pygame.draw.circle(self.scr, pygame.Color("green"), (self.x, self.y), self.scale + 5)
+        elif self.__class__ == Clear:
+            pygame.draw.circle(self.scr, pygame.Color("blue"), (self.x, self.y), self.scale + 5)
+        pygame.draw.circle(self.scr, self.col, (self.x, self.y), self.scale)
 
     def check(self):
         if self.x == self.scale:
@@ -201,6 +222,7 @@ if __name__ == '__main__':
     screen = pygame.display.set_mode(size)
 
     running = True
+    all_sprites = pygame.sprite.Group()
     all_circles = []
     all_particles = []
     font = pygame.font.Font(None, 50)
@@ -210,7 +232,8 @@ if __name__ == '__main__':
     clock = pygame.time.Clock()
     screen.fill(pygame.Color('black'))
     while running:
-        if score_streak > 1:
+        all_sprites = pygame.sprite.Group()
+        if score_streak > 1.02:
             score_streak -= 0.02
         if 1 == r.randint(1, 100):
             scale = 0
@@ -237,34 +260,69 @@ if __name__ == '__main__':
                 if before == len(all_circles):
                     all_particles.append(Number("red", "-1", x_mouse, y_mouse, screen))
                     health -= 1
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    if all_circles:
+                        random_circle = r.choice(all_circles)
+                        for i in range(len(all_circles)):
+                            if all_circles:
+                                blue = all_circles[i].__class__ != Clear
+                                if all_circles[i].shoot(random_circle.x, random_circle.y):
+                                    if all_circles and blue:
+                                        all_circles.pop(i)
+                                        break
         for i in all_circles:
-            i.check()
+            i.check_new()
         screen.fill(pygame.Color('black'))
         time.sleep(0.01)
         for i in all_circles:
             if i.x < 0 or i.x > width or i.y < 0 or i.y > height:
                 all_circles.pop(all_circles.index(i))
-            i.move()
+            i.move_new()
         for i in all_particles:
             i.move()
             i.draw()
             if i.dead():
                 all_particles.pop(all_particles.index(i))
-        text = font.render("Очки " + str(score), True, (0, 255, 0))
-        screen.blit(text, (10, 10))
-        text = font.render("Серия " + str(score_streak // 0.01 / 100), True, (0, 255, 0))
-        screen.blit(text, (10, 50))
-        text = font.render("Жизни " + str(health) + " / 10", True, (255, 0, 0))
-        screen.blit(text, (10, 90))
-        text = font.render("Шары " + str(len(all_circles)) + " / 30", True, (255, 0, 0))
-        screen.blit(text, (10, 130))
+        sprite = pygame.sprite.Sprite()
+        sprite.image = load_image("Point.png")
+        sprite.rect = sprite.image.get_rect()
+        sprite.rect.y = 10
+        sprite.rect.x = 10
+        all_sprites.add(sprite)
+        sprite = pygame.sprite.Sprite()
+        sprite.image = load_image("Combo.png")
+        sprite.rect = sprite.image.get_rect()
+        sprite.rect.y = 50
+        sprite.rect.x = 10
+        all_sprites.add(sprite)
+        sprite = pygame.sprite.Sprite()
+        sprite.image = load_image("Target.png")
+        sprite.rect = sprite.image.get_rect()
+        sprite.rect.y = 130
+        sprite.rect.x = 10
+        all_sprites.add(sprite)
+        for i in range(health):
+            sprite = pygame.sprite.Sprite()
+            sprite.image = load_image("Heart.png")
+            sprite.rect = sprite.image.get_rect()
+            sprite.rect.y = 90
+            sprite.rect.x = 10 + 25 * i
+            all_sprites.add(sprite)
+        all_sprites.draw(screen)
+        text = font.render(" " + str(int(score)), True, pygame.Color("yellow"))
+        screen.blit(text, (40, 10))
+        text = font.render(" " + str(int(score_streak // 1)) + " (x" + str(int(1 + score_streak // 10)) + ")", True, pygame.Color("yellow"))
+        screen.blit(text, (40, 50))
+        text = font.render(" " + str(len(all_circles)) + " / 30", True, (255, 0, 0))
+        screen.blit(text, (40, 130))
         if health <= 0 or len(all_circles) >= 30:
             screen.fill(pygame.Color("black"))
             text = font.render("Game over!", True, (255, 0, 0))
             text_x = width // 2 - text.get_width() // 2
             text_y = height // 2 - text.get_height() // 2
             screen.blit(text, (text_x, text_y))
-            text = font.render("Ваш счёт: " + str(score), True, (0, 255, 0))
+            text = font.render("Ваш счёт: " + str(int(score)), True, (0, 255, 0))
             text_x = width // 2 - text.get_width() // 2
             text_y = height // 2 - text.get_height() // 2 + 60
             screen.blit(text, (text_x, text_y))
