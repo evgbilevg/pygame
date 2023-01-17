@@ -81,8 +81,10 @@ class Circle:
     def shoot(self, x, y):
         if ((self.x - x) ** 2 + (self.y - y) ** 2) ** 0.5 <= self.scale:
             global score, score_streak, all_particles
-            for count in range(r.randint(30, 60)):
+            for _ in range(r.randint(30, 60)):
                 all_particles.append(Particle(self.col, self.x, self.y, self.scr))
+            all_particles.append(Number("purple", str(int(self.score * (1 + score_streak // 10))), self.x,
+                                        self.y, self.scr))
             score += self.score * (1 + score_streak // 10)
             score_streak += self.score
             return True
@@ -92,8 +94,10 @@ class Bomb(Circle):
     def shoot(self, x, y):
         if ((self.x - x) ** 2 + (self.y - y) ** 2) ** 0.5 <= self.scale:
             global score, score_streak, all_circles, all_particles
-            for count in range(r.randint(30, 60)):
+            for _ in range(r.randint(30, 60)):
                 all_particles.append(Particle(r.choice([self.col, pygame.Color("red")]), self.x, self.y, self.scr))
+            all_particles.append(Number("purple", str(int(self.score * (1 + score_streak // 10))), self.x,
+                                        self.y, self.scr))
             if 1 == r.randint(1, 5):
                 all_circles.append(Bomb(self.scr, self.x // 1, self.y // 1, self.w, self.h))
                 all_circles.append(Bomb(self.scr, self.x // 1, self.y // 1, self.w, self.h))
@@ -109,8 +113,12 @@ class Heal(Circle):
     def shoot(self, x, y):
         if ((self.x - x) ** 2 + (self.y - y) ** 2) ** 0.5 <= self.scale:
             global score, score_streak, health, all_particles
-            for count in range(r.randint(30, 60)):
+            for _ in range(r.randint(30, 60)):
                 all_particles.append(Particle(r.choice([self.col, pygame.Color("green")]), self.x, self.y, self.scr))
+            all_particles.append(Number("purple", str(int((self.score + (health % 10) * (health // 10)) *
+                                                          (1 + score_streak // 10))), self.x, self.y, self.scr))
+            all_particles.append(Number("green", "+" + str(int(self.score + (health % 10) * (health // 10) *
+                                                               (1 + score_streak // 10))), self.x, self.y, self.scr))
             health += self.score
             score += self.score + (health % 10) * (health // 10) * (1 + score_streak // 10)
             score_streak += self.score + (health % 10) * (health // 10)
@@ -122,14 +130,16 @@ class Clear(Circle):
     def shoot(self, x, y):
         if ((self.x - x) ** 2 + (self.y - y) ** 2) ** 0.5 <= self.scale:
             global score, score_streak, all_circles, all_particles
-            for count in range(r.randint(30, 60)):
+            for _ in range(r.randint(30, 60)):
                 all_particles.append(Particle(r.choice([self.col, pygame.Color("blue")]), self.x, self.y, self.scr))
+            all_particles.append(Number("purple", str(int(self.score * (1 + score_streak // 10))),
+                                        self.x, self.y, self.scr))
             score += self.score * (1 + score_streak // 10)
             score_streak += self.score
             for circle in all_circles:
                 if circle.__class__ == Clear and all_circles:
                     all_circles.pop(all_circles.index(circle))
-            for count in range(5):
+            for _ in range(5):
                 if all_circles:
                     if all_circles[0].__class__ == Clear:
                         all_circles.pop(0)
@@ -151,6 +161,28 @@ class Particle:
 
     def draw(self):
         pygame.draw.circle(self.scr, self.color, (self.x, self.y), 3)
+
+    def move(self):
+        self.x += r.choice([-2, -1, 1, 2])
+        self.y += r.choice([-2, -1, 1, 2])
+        self.life -= 1
+
+    def dead(self):
+        if self.life <= 0:
+            return True
+
+
+class Number:
+    def __init__(self, color, number, x, y, scr):
+        self.x = x
+        self.y = y
+        self.life = r.randint(50, 80)
+        self.scr = scr
+        self.text = font.render(number, True, pygame.Color(color))
+        screen.blit(self.text, (self.x, self.y))
+
+    def draw(self):
+        screen.blit(self.text, (self.x, self.y))
 
     def move(self):
         self.x += r.choice([-2, -1, 1, 2])
@@ -203,6 +235,7 @@ if __name__ == '__main__':
                             all_circles.pop(i)
                         break
                 if before == len(all_circles):
+                    all_particles.append(Number("red", "-1", x_mouse, y_mouse, screen))
                     health -= 1
         for i in all_circles:
             i.check()
@@ -219,7 +252,7 @@ if __name__ == '__main__':
                 all_particles.pop(all_particles.index(i))
         text = font.render("Очки " + str(score), True, (0, 255, 0))
         screen.blit(text, (10, 10))
-        text = font.render("Кураж " + str(score_streak // 0.01 / 100), True, (0, 255, 0))
+        text = font.render("Серия " + str(score_streak // 0.01 / 100), True, (0, 255, 0))
         screen.blit(text, (10, 50))
         text = font.render("Жизни " + str(health) + " / 10", True, (255, 0, 0))
         screen.blit(text, (10, 90))
